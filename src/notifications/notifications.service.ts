@@ -35,15 +35,36 @@ export class NotificationsService {
       `Планування сповіщення для користувача ${booking.user.email} для комнати ${booking.room.name} на ${notificationTime.toISOString()}`,
     );
 
+    const subject = `Бронювання кімнати ${booking.room.name}`;
+    const content = `Шановний(-а) ${booking.user.name}!\n\nВаше бронювання кімнати ${booking.room.name} заплановано на ${booking.startTime.toLocaleString('uk-UA')}.\n\nЗ повагою, Система бронювання кімнат.`;
+
+    const notification = await this.prisma.notification.create({
+      data: {
+        bookingId: bookingId,
+        userId: booking.userId,
+        status: 'pending',
+        type: 'confirmation',
+        subject: subject,
+        content: content,
+        scheduledTime: notificationTime,
+      },
+    });
+
     return {
       message: `Сповіщення заплановано на ${notificationTime.toISOString()}`,
       user: booking.user.email,
       room: booking.room.name,
       startTime: booking.startTime,
+      notificationId: notification.id,
     };
   }
 
-  private async sendEmail(email: string, subject: string, content: string) {
+  private async sendEmail(
+    email: string,
+    subject: string,
+    content: string,
+    notificationId?: string,
+  ) {
     this.logger.log(`Відправлення електронної пошти на адресу ${email}`);
     this.logger.log(`Тема: ${subject}`);
     this.logger.log(`Вміст: ${content}`);
@@ -70,6 +91,17 @@ export class NotificationsService {
 
       const info = await transporter.sendMail(mailOptions);
       this.logger.log(`Email відправлено: ${info.messageId}`);
+
+      if (notificationId) {
+        await this.prisma.notification.update({
+          where: { id: notificationId },
+          data: {
+            status: 'sent',
+            sentTime: new Date(),
+          },
+        });
+      }
+
       return true;
     } catch (error) {
       const errorMessage =
@@ -77,6 +109,16 @@ export class NotificationsService {
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(`Помилка відправки email: ${errorMessage}`, errorStack);
+
+      if (notificationId) {
+        await this.prisma.notification.update({
+          where: { id: notificationId },
+          data: {
+            status: 'failed',
+          },
+        });
+      }
+
       return false;
     }
   }
@@ -108,7 +150,24 @@ export class NotificationsService {
       const subject = `Нагадування про зустріч у кімнаті ${booking.room.name}`;
       const content = `Шановний(-а) ${booking.user.name}!\n\nНагадуємо, що через 15 хвилин, о ${startTimeFormatted}, у вас заплановано зустріч у кімнаті ${booking.room.name}.\n\nЗ повагою, Система бронювання кімнат.`;
 
-      await this.sendEmail(booking.user.email, subject, content);
+      const notification = await this.prisma.notification.create({
+        data: {
+          bookingId: booking.id,
+          userId: booking.userId,
+          status: 'pending',
+          type: 'reminder',
+          subject: subject,
+          content: content,
+          scheduledTime: now,
+        },
+      });
+
+      await this.sendEmail(
+        booking.user.email,
+        subject,
+        content,
+        notification.id,
+      );
       this.logger.log(
         `Відправлено нагадування для користувача ${booking.user.email} про зустріч у кімнаті ${booking.room.name}`,
       );
@@ -144,10 +203,32 @@ export class NotificationsService {
       const subject = `Початок зустрічі у кімнаті ${booking.room.name}`;
       const content = `Шановний(-а) ${booking.user.name}!\n\nВаша зустріч у кімнаті ${booking.room.name} почалася о ${meetingStartTime}.\n\nЗ повагою, Система бронювання кімнат.`;
 
-      await this.sendEmail(booking.user.email, subject, content);
+      const notification = await this.prisma.notification.create({
+        data: {
+          bookingId: booking.id,
+          userId: booking.userId,
+          status: 'pending',
+          type: 'start',
+          subject: subject,
+          content: content,
+          scheduledTime: now,
+        },
+      });
+
+      await this.sendEmail(
+        booking.user.email,
+        subject,
+        content,
+        notification.id,
+      );
       this.logger.log(
         `Відправлено сповіщення про початок зустрічі для користувача ${booking.user.email} у кімнаті ${booking.room.name}`,
       );
+
+      await this.prisma.booking.update({
+        where: { id: booking.id },
+        data: { status: 'completed' },
+      });
     }
   }
 }
