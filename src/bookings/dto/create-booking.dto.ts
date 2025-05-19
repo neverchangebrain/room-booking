@@ -1,4 +1,10 @@
-import { IsDateString, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsString,
+  IsOptional,
+  IsInt,
+  Min,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateBookingDto {
@@ -29,4 +35,45 @@ export class CreateBookingDto {
   })
   @IsDateString()
   endTime: string;
+
+  @ApiProperty({
+    description: 'Статус бронювання',
+    example: 'confirmed',
+    default: 'confirmed',
+    required: false,
+    enum: ['confirmed', 'cancelled', 'completed'],
+  })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiProperty({
+    description: 'Назва/тема зустрічі',
+    example: 'Щотижнева нарада команди',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @ApiProperty({
+    description: 'Опис зустрічі',
+    example:
+      'Обговорення прогресу по проекту та планування на наступний тиждень',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiProperty({
+    description: 'Кількість учасників',
+    example: 8,
+    required: false,
+    minimum: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  attendees?: number;
 }

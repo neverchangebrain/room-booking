@@ -7,7 +7,12 @@ export class RoomsService {
   constructor(private prisma: PrismaService) {}
 
   async create(createRoomDto: CreateRoomDto) {
-    return this.prisma.room.create({ data: createRoomDto });
+    const roomData = {
+      ...createRoomDto,
+      equipment: createRoomDto.equipment || [],
+    };
+
+    return this.prisma.room.create({ data: roomData });
   }
 
   async findAll() {

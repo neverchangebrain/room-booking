@@ -52,8 +52,9 @@ export class BookingsService {
       data: {
         startTime: startDate,
         endTime: endDate,
-        room: { connect: { id: roomId } },
-        user: { connect: { id: userId } },
+        roomId: roomId,
+        userId: userId,
+        status: 'confirmed',
       },
     });
   }

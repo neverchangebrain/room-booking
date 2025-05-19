@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -8,6 +12,16 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: createUserDto.email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException(
+        `Користувач з email ${createUserDto.email} вже існує`,
+      );
+    }
+
     return this.prisma.user.create({
       data: createUserDto,
     });
@@ -28,22 +42,38 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
-    try {
-      return await this.prisma.user.update({
-        where: { id },
-        data: updateUserDto,
-      });
-    } catch {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
       throw new NotFoundException(`Користувача з ID ${id} не знайдено`);
     }
+
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: updateUserDto.email },
+      });
+
+      if (existingUser) {
+        throw new ConflictException(
+          `Користувач з email ${updateUserDto.email} вже існує`,
+        );
+      }
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: updateUserDto,
+    });
   }
 
   async remove(id: string) {
-    try {
-      return await this.prisma.user.delete({ where: { id } });
-    } catch {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
       throw new NotFoundException(`Користувача з ID ${id} не знайдено`);
     }
+
+    return this.prisma.user.delete({ where: { id } });
   }
 
   async getUserRooms(userId: string) {
